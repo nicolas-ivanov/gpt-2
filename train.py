@@ -42,8 +42,8 @@ parser.add_argument('--top_p', type=float, default=0.0, help='P for top-p sampli
 parser.add_argument('--restore_from', type=str, default='latest', help='Either "latest", "fresh", or a path to a checkpoint file')
 parser.add_argument('--run_name', type=str, default='run1', help='Run id. Name of subdirectory in checkpoint/ and samples/')
 parser.add_argument('--sample_every', metavar='N', type=int, default=100, help='Generate samples every N steps')
-parser.add_argument('--sample_length', metavar='TOKENS', type=int, default=1023, help='Sample this many tokens')
-parser.add_argument('--sample_num', metavar='N', type=int, default=1, help='Generate this many samples')
+parser.add_argument('--sample_length', metavar='TOKENS', type=int, default=40, help='Sample this many tokens')
+parser.add_argument('--sample_num', metavar='N', type=int, default=3, help='Generate this many samples')
 parser.add_argument('--save_every', metavar='N', type=int, default=1000, help='Write a checkpoint every N steps')
 
 parser.add_argument('--val_dataset', metavar='PATH', type=str, default=None, help='Dataset for validation loss, defaults to --dataset.')
@@ -87,10 +87,12 @@ def main():
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     config.graph_options.rewrite_options.layout_optimizer = rewriter_config_pb2.RewriterConfig.OFF
+
     with tf.Session(config=config) as sess:
         context = tf.placeholder(tf.int32, [args.batch_size, None])
         context_in = randomize(context, hparams, args.noise)
         output = model.model(hparams=hparams, X=context_in)
+
         loss = tf.reduce_mean(
             tf.nn.sparse_softmax_cross_entropy_with_logits(
                 labels=context[:, 1:], logits=output['logits'][:, :-1]))
@@ -102,7 +104,6 @@ def main():
                 tf.nn.sparse_softmax_cross_entropy_with_logits(
                     labels=val_context[:, 1:], logits=val_output['logits'][:, :-1]))
             val_loss_summary = tf.summary.scalar('val_loss', val_loss)
-
 
         tf_sample = sample.sample_sequence(
             hparams=hparams,
@@ -133,11 +134,13 @@ def main():
             opt_compute = opt.compute_gradients(loss)
             opt_apply = opt.apply_gradients()
             summary_loss = tf.summary.scalar('loss', opt_apply)
+
         else:
             if args.memory_saving_gradients:
                 opt_grads = memory_saving_gradients.gradients(loss, train_vars)
             else:
                 opt_grads = tf.gradients(loss, train_vars)
+
             opt_grads = list(zip(opt_grads, train_vars))
             opt_apply = opt.apply_gradients(opt_grads)
             summary_loss = tf.summary.scalar('loss', loss)
@@ -152,6 +155,7 @@ def main():
             var_list=all_vars,
             max_to_keep=5,
             keep_checkpoint_every_n_hours=2)
+
         sess.run(tf.global_variables_initializer())
 
         if args.restore_from == 'latest':
@@ -161,19 +165,24 @@ def main():
                 # Get fresh GPT weights if new run.
                 ckpt = tf.train.latest_checkpoint(
                     os.path.join('models', args.model_name))
+
         elif args.restore_from == 'fresh':
             ckpt = tf.train.latest_checkpoint(
                 os.path.join('models', args.model_name))
+
         else:
             ckpt = tf.train.latest_checkpoint(args.restore_from)
+
         print('Loading checkpoint', ckpt)
         saver.restore(sess, ckpt)
 
         print('Loading dataset...')
         chunks = load_dataset(enc, args.dataset, args.combine)
         data_sampler = Sampler(chunks)
+
         if args.val_every > 0:
             val_chunks = load_dataset(enc, args.val_dataset, args.combine) if args.val_dataset else chunks
+
         print('dataset has', data_sampler.total_size, 'tokens')
         print('Training...')
 
@@ -186,6 +195,7 @@ def main():
 
         counter = 1
         counter_path = os.path.join(CHECKPOINT_DIR, args.run_name, 'counter')
+
         if os.path.exists(counter_path):
             # Load the step number if we're resuming a run
             # Add 1 so we don't immediately try to save again
@@ -202,6 +212,7 @@ def main():
                 sess,
                 os.path.join(CHECKPOINT_DIR, args.run_name, 'model'),
                 global_step=counter)
+
             with open(counter_path, 'w') as fp:
                 fp.write(str(counter) + '\n')
 
@@ -210,17 +221,21 @@ def main():
             context_tokens = data_sampler.sample(1)
             all_text = []
             index = 0
+
             while index < args.sample_num:
                 out = sess.run(
                     tf_sample,
                     feed_dict={context: args.batch_size * [context_tokens]})
+
                 for i in range(min(args.sample_num - index, args.batch_size)):
                     text = enc.decode(out[i])
                     text = '======== SAMPLE {} ========\n{}\n'.format(
                         index + 1, text)
                     all_text.append(text)
                     index += 1
+
             print(text)
+
             maketree(os.path.join(SAMPLE_DIR, args.run_name))
             with open(
                     os.path.join(SAMPLE_DIR, args.run_name,
@@ -230,12 +245,15 @@ def main():
         def validation():
             print('Calculating validation loss...')
             losses = []
+
             for batch in tqdm.tqdm(val_batches):
                 losses.append(sess.run(val_loss, feed_dict={val_context: batch}))
+
             v_val_loss = np.mean(losses)
             v_summary = sess.run(val_loss_summary, feed_dict={val_loss: v_val_loss})
             summary_log.add_summary(v_summary, counter)
             summary_log.flush()
+
             print(
                 '[{counter} | {time:2.2f}] validation loss = {loss:2.2f}'
                 .format(
@@ -245,7 +263,6 @@ def main():
 
         def sample_batch():
             return [data_sampler.sample(1024) for _ in range(args.batch_size)]
-
 
         avg_loss = (0.0, 0.0)
         start_time = time.time()
