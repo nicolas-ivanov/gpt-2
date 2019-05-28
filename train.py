@@ -47,7 +47,7 @@ parser.add_argument('--sample_num', metavar='N', type=int, default=5, help='Gene
 parser.add_argument('--save_every', metavar='N', type=int, default=1000, help='Write a checkpoint every N steps')
 
 parser.add_argument('--val_dataset', metavar='PATH', type=str, default=None, help='Dataset for validation loss, defaults to --dataset.')
-parser.add_argument('--val_batch_size', metavar='SIZE', type=int, default=5, help='Batch size for validation.')
+parser.add_argument('--val_batch_size', metavar='SIZE', type=int, default=1, help='Batch size for validation.')
 parser.add_argument('--val_batch_count', metavar='N', type=int, default=1, help='Number of batches for validation.')
 parser.add_argument('--val_every', metavar='STEPS', type=int, default=100, help='Calculate validation loss every STEPS steps.')
 
