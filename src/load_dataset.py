@@ -31,7 +31,7 @@ def load_dataset(enc, path, combine):
         else:
             # Plain text
             with open(path, 'r') as fp:
-                for line in fp.readline():
+                for line in fp:
                     raw_text += line + '<|endoftext|>'
             if len(raw_text) >= combine:
                 tokens = np.stack(enc.encode(raw_text))
