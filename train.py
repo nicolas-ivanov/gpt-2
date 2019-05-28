@@ -226,7 +226,7 @@ def main():
             while index < args.sample_num:
                 out = sess.run(
                     tf_sample,
-                    feed_dict={val_context: val_batches[0]})
+                    feed_dict={context: val_batches[0]})
 
                 for i in range(min(args.sample_num - index, args.batch_size)):
                     text = enc.decode(out[i])
@@ -263,7 +263,7 @@ def main():
                     loss=v_val_loss))
 
         def sample_batch():
-            return [data_sampler.sample(1024) for _ in range(args.batch_size)]
+            return [data_sampler.sample(20) for _ in range(args.batch_size)]
 
         avg_loss = (0.0, 0.0)
         start_time = time.time()
