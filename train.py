@@ -226,7 +226,7 @@ def main():
             while index < args.sample_num:
                 out = sess.run(
                     tf_sample,
-                    feed_dict={context: val_batches[0]})
+                    feed_dict={val_context: val_batches[0]})
 
                 for i in range(min(args.sample_num - index, args.batch_size)):
                     text = enc.decode(out[i])
