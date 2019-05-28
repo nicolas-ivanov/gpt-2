@@ -42,14 +42,14 @@ parser.add_argument('--top_p', type=float, default=0.0, help='P for top-p sampli
 parser.add_argument('--restore_from', type=str, default='latest', help='Either "latest", "fresh", or a path to a checkpoint file')
 parser.add_argument('--run_name', type=str, default='run1', help='Run id. Name of subdirectory in checkpoint/ and samples/')
 parser.add_argument('--sample_every', metavar='N', type=int, default=100, help='Generate samples every N steps')
-parser.add_argument('--sample_length', metavar='TOKENS', type=int, default=40, help='Sample this many tokens')
-parser.add_argument('--sample_num', metavar='N', type=int, default=3, help='Generate this many samples')
+parser.add_argument('--sample_length', metavar='TOKENS', type=int, default=120, help='Sample this many tokens')
+parser.add_argument('--sample_num', metavar='N', type=int, default=5, help='Generate this many samples')
 parser.add_argument('--save_every', metavar='N', type=int, default=1000, help='Write a checkpoint every N steps')
 
 parser.add_argument('--val_dataset', metavar='PATH', type=str, default=None, help='Dataset for validation loss, defaults to --dataset.')
-parser.add_argument('--val_batch_size', metavar='SIZE', type=int, default=2, help='Batch size for validation.')
-parser.add_argument('--val_batch_count', metavar='N', type=int, default=40, help='Number of batches for validation.')
-parser.add_argument('--val_every', metavar='STEPS', type=int, default=0, help='Calculate validation loss every STEPS steps.')
+parser.add_argument('--val_batch_size', metavar='SIZE', type=int, default=5, help='Batch size for validation.')
+parser.add_argument('--val_batch_count', metavar='N', type=int, default=1, help='Number of batches for validation.')
+parser.add_argument('--val_every', metavar='STEPS', type=int, default=100, help='Calculate validation loss every STEPS steps.')
 
 
 def maketree(path):
@@ -181,6 +181,7 @@ def main():
         data_sampler = Sampler(chunks)
 
         if args.val_every > 0:
+            print('Loading validation dataset...')
             val_chunks = load_dataset(enc, args.val_dataset, args.combine) if args.val_dataset else chunks
 
         print('dataset has', data_sampler.total_size, 'tokens')
@@ -190,7 +191,7 @@ def main():
             # Sample from validation set once with fixed seed to make
             # it deterministic during training as well as across runs.
             val_data_sampler = Sampler(val_chunks, seed=1)
-            val_batches = [[val_data_sampler.sample(1024) for _ in range(args.val_batch_size)]
+            val_batches = [[val_data_sampler.sample(20) for _ in range(args.val_batch_size)]
                            for _ in range(args.val_batch_count)]
 
         counter = 1
@@ -218,14 +219,14 @@ def main():
 
         def generate_samples():
             print('Generating samples...')
-            context_tokens = data_sampler.sample(1)
+            # context_tokens = data_sampler.sample(1)
             all_text = []
             index = 0
 
             while index < args.sample_num:
                 out = sess.run(
                     tf_sample,
-                    feed_dict={context: args.batch_size * [context_tokens]})
+                    feed_dict={context: val_batches[0]})
 
                 for i in range(min(args.sample_num - index, args.batch_size)):
                     text = enc.decode(out[i])
